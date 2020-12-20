@@ -1,11 +1,15 @@
 #!/usr/bin/env python3
 
 import argparse
+from datetime import datetime
+import email
+import io
 import json
 import os
 import sys
 from urllib.parse import urlparse
 
+from PIL.PngImagePlugin import PngImageFile, PngInfo
 import requests
 
 def main():
@@ -68,15 +72,21 @@ def main():
             params['offset'] = page * page_size
             r = s.get('https://schools.mybrightwheel.com/api/v1/students/4a1fe4c5-0a33-45c4-9e1c-a470fb28d3e2/activities', headers=headers, params=params)
             data = r.json()
-            if data['count'] <= 0:
+            activities = data['activities']
+            if len(activities) <= 0:
                 return
             for activity in data['activities']:
                 url = activity['media']['image_url']
                 path = urlparse(url).path.split('/')[-1]
-                with open('{directory}/{path}'.format(directory=args.directory, path=path), 'wb') as f:
-                    r = s.get(url)
-                    f.write(r.content)
+                r = s.get(url)
+                image = PngImageFile(io.BytesIO(r.content))
+                metadata = PngInfo()
+                created_at = datetime.strptime(activity['created_at'], "%Y-%m-%dT%H:%M:%S.%f%z")
+                metadata.add_text('Creation Time', email.utils.format_datetime(created_at))
+                metadata.add_text('Description', activity['note'])
+                image.save('{directory}/{path}'.format(directory=args.directory, path=path), pnginfo=metadata)
             page += 1
+            return
 
 
 if __name__ == "__main__":
