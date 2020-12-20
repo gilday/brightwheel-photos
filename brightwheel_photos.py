@@ -9,6 +9,7 @@ import os
 import sys
 from urllib.parse import urlparse
 
+import piexif
 from PIL.PngImagePlugin import PngImageFile, PngInfo
 import requests
 
@@ -38,18 +39,14 @@ def main():
 
         # find and save all photos for the student
         for activity in find_photo_activities(s):
-            print(json.dumps(activity))
             url = activity['media']['image_url']
             r = s.get(url)
             image = PngImageFile(io.BytesIO(r.content))
-            metadata = PngInfo()
             created_at = datetime.strptime(activity['created_at'], "%Y-%m-%dT%H:%M:%S.%f%z")
-            metadata.add_text('Creation Time', email.utils.format_datetime(created_at))
-            note = activity['note']
-            if note:
-                metadata.add_text('Description', activity['note'])
-            path = urlparse(url).path.split('/')[-1][:-3]
-            image.save('{directory}/{path}.jpg'.format(directory=args.directory, path=path), pnginfo=metadata)
+            comment = activity['note']
+            exif = build_exif_bytes(image, created_at, comment)
+            path = urlparse(url).path.split('/')[-1][:-4]
+            image.save('{directory}/{path}.jpg'.format(directory=args.directory, path=path), exif=exif)
 
 
 def login(s, email, password):
@@ -100,7 +97,25 @@ def find_photo_activities(s):
         for activity in activities:
             yield activity
         page += 1
- 
+
+
+def build_exif_bytes(image, created_date, comment):
+    exif_date = created_date.strftime("%Y:%m:%d %H:%M:%S")
+    try:
+        exif = piexif.load(image.info['exif'])
+    except KeyError:
+        exif = {
+            '0th': {},
+            'Exif': {
+            }
+        }
+    exif['0th'][piexif.ImageIFD.DateTime] = exif_date.encode('utf-8')
+    exif['Exif'][piexif.ExifIFD.DateTimeOriginal] = exif_date.encode('utf-8')
+    exif['Exif'][piexif.ExifIFD.DateTimeDigitized] = exif_date.encode('utf-8')
+    if comment:
+        exif['0th'][piexif.ImageIFD.ImageDescription] = comment.encode('utf-8')
+    return piexif.dump(exif)
+
 
 if __name__ == "__main__":
     main()
