@@ -23,7 +23,14 @@ def main():
 
     os.makedirs(args.directory, exist_ok=True)
     with requests.Session() as s:
-        login(s, args.email, args.password)
+        try:
+            login(s, args.email, args.password)
+        except requests.HTTPError as err:
+            if [err.response.status_code == 401]:
+                print('Login failed', file=sys.stderr)
+                sys.exit(1)
+                return
+            raise err
         # try to find student_id if not provided
         student_id = args.student_id
         if not student_id:
