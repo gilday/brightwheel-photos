@@ -6,9 +6,8 @@ import io
 import os
 import sys
 from urllib.parse import urlparse
-
 import piexif
-from PIL.PngImagePlugin import PngImageFile
+from PIL import Image
 import requests
 
 
@@ -25,6 +24,7 @@ def main():
         "--directory", required=True, help="directory in which to save the photos"
     )
     parser.add_argument("--student-id", help="Brightwheel student ID")
+    parser.add_argument("--since", help="Skip any photos before a given YYYY-MM-DD")
     args = parser.parse_args()
 
     os.makedirs(args.directory, exist_ok=True)
@@ -58,9 +58,16 @@ def main():
 
         # find and save all photos for the student
         for activity in find_photo_activities(s, student_id):
+            # Skip if less than since argument
+            if args.since:
+                event_date = datetime.strptime(activity["event_date"][0:10], '%Y-%m-%d')
+                since = datetime.strptime(args.since, '%Y-%m-%d')
+                if event_date < since:
+                    continue
+
             url = activity["media"]["image_url"]
             r = s.get(url)
-            image = PngImageFile(io.BytesIO(r.content))
+            image = Image.open(io.BytesIO(r.content))
             created_at = datetime.strptime(
                 activity["created_at"], "%Y-%m-%dT%H:%M:%S.%f%z"
             )
