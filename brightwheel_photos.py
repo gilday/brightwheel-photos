@@ -35,8 +35,6 @@ def main():
             if [err.response.status_code == 401]:
                 print("Login failed", file=sys.stderr)
                 sys.exit(1)
-                return
-            raise err
         # try to find student_id if not provided
         student_id = args.student_id
         if not student_id:
@@ -53,11 +51,10 @@ def main():
                         )
                     )
                 sys.exit(1)
-                return
             student_id = students[0]["object_id"]
 
         # find and save all photos for the student
-        for activity in find_photo_activities(s, student_id):
+        for activity in find_activities(s, student_id):
             # Skip if less than since argument
             if args.since:
                 event_date = datetime.strptime(activity["event_date"][0:10], '%Y-%m-%d')
@@ -65,19 +62,27 @@ def main():
                 if event_date < since:
                     continue
 
-            url = activity["media"]["image_url"]
-            r = s.get(url)
-            image = Image.open(io.BytesIO(r.content))
-            created_at = datetime.strptime(
-                activity["created_at"], "%Y-%m-%dT%H:%M:%S.%f%z"
-            )
-            comment = activity["note"]
-            exif = build_exif_bytes(image, created_at, comment)
-            path = urlparse(url).path.split("/")[-1][:-4]
-            image.save(
-                "{directory}/{path}.jpg".format(directory=args.directory, path=path),
-                exif=exif,
-            )
+            if activity["media"] is not None:
+                url = activity["media"]["image_url"]
+                r = s.get(url)
+                image = Image.open(io.BytesIO(r.content))
+                created_at = datetime.strptime(
+                    activity["created_at"], "%Y-%m-%dT%H:%M:%S.%f%z"
+                )
+                comment = activity["note"]
+                exif = build_exif_bytes(image, created_at, comment)
+                path = urlparse(url).path.split("/")[-1][:-4]
+                image.save(
+                    "{directory}/{path}.jpg".format(directory=args.directory, path=path),
+                    exif=exif,
+                )
+            elif activity["video_info"] is not None:
+                url = activity["video_info"]["downloadable_url"]
+                r = s.get(url, stream=True)
+                path = urlparse(url).path.split("/")[-1][:-4]
+                with open("{directory}/{path}.mp4".format(directory=args.directory, path=path), "wb") as f:
+                    for chunk in r.iter_content(chunk_size=128):
+                        f.write(chunk)
 
 
 def login(s, email, password):
@@ -114,31 +119,34 @@ def find_students(s):
     return [record["student"] for record in r.json()["students"]]
 
 
-def find_photo_activities(s, student_id):
-    """Generator that returns all photo activities for the given student"""
-    page = 0
+def find_activities(s, student_id):
+    """Generator that returns all photo and video activities for the given student"""
+    action_types = ['ac_video', 'ac_photo']
     page_size = 10
     params = {
         "page_size": page_size,
-        "action_type": "ac_photo",
         "include_parent_actions": "true",
     }
-    while True:
-        params["page"] = page
-        params["offset"] = page * page_size
-        r = s.get(
-            "https://schools.mybrightwheel.com/api/v1/students/{}/activities".format(
-                student_id
-            ),
-            params=params,
-        )
-        data = r.json()
-        activities = data["activities"]
-        if len(activities) <= 0:
-            return
-        for activity in activities:
-            yield activity
-        page += 1
+    for action_type in action_types:
+        params["action_type"] = action_type
+        page = 0
+
+        while True:
+            params["page"] = page
+            params["offset"] = page * page_size
+            r = s.get(
+                "https://schools.mybrightwheel.com/api/v1/students/{}/activities".format(
+                    student_id
+                ),
+                params=params,
+            )
+            data = r.json()
+            activities = data["activities"]
+            if len(activities) <= 0:
+                break
+            for activity in activities:
+                yield activity
+            page += 1
 
 
 def build_exif_bytes(image, created_date, comment):
