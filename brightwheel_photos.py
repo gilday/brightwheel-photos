@@ -25,6 +25,8 @@ def main():
     )
     parser.add_argument("--student-id", help="Brightwheel student ID")
     parser.add_argument("--since", help="Skip any photos before a given YYYY-MM-DD")
+    parser.add_argument("--before", help="Skip any photos after a given YYYY-MM-DD")
+    parser.add_argument("--skip-existing", action='store_true', help="Skip any existing photos or videos")
     args = parser.parse_args()
 
     os.makedirs(args.directory, exist_ok=True)
@@ -62,28 +64,53 @@ def main():
                 since = datetime.strptime(args.since, '%Y-%m-%d')
                 if event_date < since:
                     continue
+            
+            # Skip if greater than before argument
+            if args.before:
+                event_date = datetime.strptime(activity["event_date"][0:10], '%Y-%m-%d')
+                before = datetime.strptime(args.before, '%Y-%m-%d')
+                if event_date > before:
+                    continue
 
             if activity["media"] is not None:
                 url = activity["media"]["image_url"]
-                r = s.get(url)
-                image = Image.open(io.BytesIO(r.content))
+                path = urlparse(url).path.split("/")[-1][:-4]
                 created_at = datetime.strptime(
                     activity["created_at"], "%Y-%m-%dT%H:%M:%S.%f%z"
                 )
+                if args.skip_existing is True and os.path.isfile(f'{args.directory}/{path}'):
+                    print("skipping download of photo {created_at}, file exists already")
+                    continue
+
+                # grab it
+                r = s.get(url)
+                image = Image.open(io.BytesIO(r.content))
                 comment = activity["note"]
                 exif = build_exif_bytes(image, created_at, comment)
-                path = urlparse(url).path.split("/")[-1][:-4]
                 image.save(
                     "{directory}/{path}.jpg".format(directory=args.directory, path=path),
                     exif=exif,
                 )
+                print(f"downloaded photo from {created_at}")
             elif activity["video_info"] is not None:
                 url = activity["video_info"]["downloadable_url"]
-                r = s.get(url, stream=True)
                 path = urlparse(url).path.split("/")[-1][:-4]
-                with open("{directory}/{path}.mp4".format(directory=args.directory, path=path), "wb") as f:
-                    for chunk in r.iter_content(chunk_size=128):
-                        f.write(chunk)
+                created_at = datetime.strptime(
+                    activity["created_at"], "%Y-%m-%dT%H:%M:%S.%f%z"
+                )
+                if args.skip_existing is True and os.path.isfile(f'{args.directory}/{path}'):
+                    print("skipping download of video {created_at}, file exists already")
+                    continue
+
+                # grab it -- for some reason we need to use a new session to
+                # get the video content; using the existing session results
+                # in a permission denied error
+                with requests.Session() as vs:
+                    r = vs.get(url, stream=True)
+                    with open("{directory}/{path}.mp4".format(directory=args.directory, path=path), "wb") as f:
+                        for chunk in r.iter_content(chunk_size=128):
+                            f.write(chunk)
+                        print(f"downloaded video from {created_at} from {url}")
 
 def trigger_2fa(s, email, password):
     """Trigger sending the 2FA login code"""
