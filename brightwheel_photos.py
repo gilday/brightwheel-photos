@@ -30,7 +30,8 @@ def main():
     os.makedirs(args.directory, exist_ok=True)
     with requests.Session() as s:
         try:
-            login(s, args.email, args.password)
+            twofacode = trigger_2fa(s, args.email, args.password)
+            login(s, args.email, args.password, twofacode)
         except requests.HTTPError as err:
             if [err.response.status_code == 401]:
                 print("Login failed", file=sys.stderr)
@@ -84,14 +85,55 @@ def main():
                     for chunk in r.iter_content(chunk_size=128):
                         f.write(chunk)
 
+def trigger_2fa(s, email, password):
+    """Trigger sending the 2FA login code"""
+    login_data = {"user": {"email": email, "password": password}}
+    headers = {
+        'Accept': 'application/json, text/plain, */*',
+        'Sec-Fetch-Site': 'same-origin',
+        'Accept-Language': 'en',
+        'Accept-Encoding': 'gzip, deflate, br',
+        'Sec-Fetch-Mode': 'cors',
+        'Host': 'schools.mybrightwheel.com',
+        'Origin': 'https://schools.mybrightwheel.com',
+        'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/16.5.2 Safari/605.1.15',
+        'Referer': 'https://schools.mybrightwheel.com/sign-in',
+        'Sec-Fetch-Dest': 'empty',
+        'X-Client-Name': 'web',
+        'X-Client-Version': '225',
+    }
+    r = s.post(
+        "https://schools.mybrightwheel.com/api/v1/sessions/start",
+        headers=headers,
+        json=login_data,
+    )
+    r.raise_for_status()
+    data = r.json()
+    if data["2fa_required"] == True:
+        print(f'2FA required, code sent to {data["2fa_code_sent_to"][0]}')
+        twofacode = input("Enter 2FA code: ")
+        return twofacode
+    return None
 
-def login(s, email, password):
+def login(s, email, password, twofacode = None):
     """Login to Brightwheel and update the given requests session"""
     # login
     login_data = {"user": {"email": email, "password": password}}
+    if not twofacode is None:
+        login_data["2fa_code"] = twofacode
+    
     headers = {
-        "X-Client-Name": "web",
-        "X-Client-Version": "b15cec31e66fa803de35b53260872aa7e5e84e29",
+        'Accept': 'application/json, text/plain, */*',
+        'Sec-Fetch-Site': 'same-origin',
+        'Accept-Language': 'en',
+        'Accept-Encoding': 'gzip, deflate, br',
+        'Sec-Fetch-Mode': 'cors',
+        'Host': 'schools.mybrightwheel.com',
+        'Origin': 'https://schools.mybrightwheel.com',
+        'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/16.5.2 Safari/605.1.15',
+        'Referer': 'https://schools.mybrightwheel.com/sign-in',
+        'X-Client-Name': 'web',
+        'X-Client-Version': '225',
     }
     r = s.post(
         "https://schools.mybrightwheel.com/api/v1/sessions",
