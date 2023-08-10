@@ -25,12 +25,15 @@ def main():
     )
     parser.add_argument("--student-id", help="Brightwheel student ID")
     parser.add_argument("--since", help="Skip any photos before a given YYYY-MM-DD")
+    parser.add_argument("--before", help="Skip any photos after a given YYYY-MM-DD")
+    parser.add_argument("--skip-existing", action='store_true', help="Skip any existing photos or videos")
     args = parser.parse_args()
 
     os.makedirs(args.directory, exist_ok=True)
     with requests.Session() as s:
         try:
-            login(s, args.email, args.password)
+            twofacode = trigger_2fa(s, args.email, args.password)
+            login(s, args.email, args.password, twofacode)
         except requests.HTTPError as err:
             if [err.response.status_code == 401]:
                 print("Login failed", file=sys.stderr)
@@ -61,37 +64,103 @@ def main():
                 since = datetime.strptime(args.since, '%Y-%m-%d')
                 if event_date < since:
                     continue
+            
+            # Skip if greater than before argument
+            if args.before:
+                event_date = datetime.strptime(activity["event_date"][0:10], '%Y-%m-%d')
+                before = datetime.strptime(args.before, '%Y-%m-%d')
+                if event_date > before:
+                    continue
 
             if activity["media"] is not None:
                 url = activity["media"]["image_url"]
-                r = s.get(url)
-                image = Image.open(io.BytesIO(r.content))
+                path = urlparse(url).path.split("/")[-1][:-4]
                 created_at = datetime.strptime(
                     activity["created_at"], "%Y-%m-%dT%H:%M:%S.%f%z"
                 )
+                if args.skip_existing is True and os.path.isfile(f'{args.directory}/{path}'):
+                    print("skipping download of photo {created_at}, file exists already")
+                    continue
+
+                # grab it
+                r = s.get(url)
+                image = Image.open(io.BytesIO(r.content))
                 comment = activity["note"]
                 exif = build_exif_bytes(image, created_at, comment)
-                path = urlparse(url).path.split("/")[-1][:-4]
                 image.save(
                     "{directory}/{path}.jpg".format(directory=args.directory, path=path),
                     exif=exif,
                 )
+                print(f"downloaded photo from {created_at}")
             elif activity["video_info"] is not None:
                 url = activity["video_info"]["downloadable_url"]
-                r = s.get(url, stream=True)
                 path = urlparse(url).path.split("/")[-1][:-4]
-                with open("{directory}/{path}.mp4".format(directory=args.directory, path=path), "wb") as f:
-                    for chunk in r.iter_content(chunk_size=128):
-                        f.write(chunk)
+                created_at = datetime.strptime(
+                    activity["created_at"], "%Y-%m-%dT%H:%M:%S.%f%z"
+                )
+                if args.skip_existing is True and os.path.isfile(f'{args.directory}/{path}'):
+                    print("skipping download of video {created_at}, file exists already")
+                    continue
 
+                # grab it -- for some reason we need to use a new session to
+                # get the video content; using the existing session results
+                # in a permission denied error
+                with requests.Session() as vs:
+                    r = vs.get(url, stream=True)
+                    with open("{directory}/{path}.mp4".format(directory=args.directory, path=path), "wb") as f:
+                        for chunk in r.iter_content(chunk_size=128):
+                            f.write(chunk)
+                        print(f"downloaded video from {created_at} from {url}")
 
-def login(s, email, password):
+def trigger_2fa(s, email, password):
+    """Trigger sending the 2FA login code"""
+    login_data = {"user": {"email": email, "password": password}}
+    headers = {
+        'Accept': 'application/json, text/plain, */*',
+        'Sec-Fetch-Site': 'same-origin',
+        'Accept-Language': 'en',
+        'Accept-Encoding': 'gzip, deflate, br',
+        'Sec-Fetch-Mode': 'cors',
+        'Host': 'schools.mybrightwheel.com',
+        'Origin': 'https://schools.mybrightwheel.com',
+        'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/16.5.2 Safari/605.1.15',
+        'Referer': 'https://schools.mybrightwheel.com/sign-in',
+        'Sec-Fetch-Dest': 'empty',
+        'X-Client-Name': 'web',
+        'X-Client-Version': '225',
+    }
+    r = s.post(
+        "https://schools.mybrightwheel.com/api/v1/sessions/start",
+        headers=headers,
+        json=login_data,
+    )
+    r.raise_for_status()
+    data = r.json()
+    if data["2fa_required"] == True:
+        print(f'2FA required, code sent to {data["2fa_code_sent_to"][0]}')
+        twofacode = input("Enter 2FA code: ")
+        return twofacode
+    return None
+
+def login(s, email, password, twofacode = None):
     """Login to Brightwheel and update the given requests session"""
     # login
     login_data = {"user": {"email": email, "password": password}}
+    if not twofacode is None:
+        login_data["2fa_code"] = twofacode
+    
     headers = {
-        "X-Client-Name": "web",
-        "X-Client-Version": "b15cec31e66fa803de35b53260872aa7e5e84e29",
+        'Accept': 'application/json, text/plain, */*',
+        'Sec-Fetch-Site': 'same-origin',
+        'Accept-Language': 'en',
+        'Accept-Encoding': 'gzip, deflate, br',
+        'Sec-Fetch-Mode': 'cors',
+        'Host': 'schools.mybrightwheel.com',
+        'Origin': 'https://schools.mybrightwheel.com',
+        'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/16.5.2 Safari/605.1.15',
+        'Referer': 'https://schools.mybrightwheel.com/sign-in',
+        'X-Client-Name': 'web',
+        'X-Client-Version': '225',
     }
     r = s.post(
         "https://schools.mybrightwheel.com/api/v1/sessions",
