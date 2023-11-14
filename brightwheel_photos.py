@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 
 import argparse
-from datetime import datetime
+from datetime import datetime, timezone
 import io
 import os
 import sys
@@ -78,8 +78,8 @@ def main():
                 created_at = datetime.strptime(
                     activity["created_at"], "%Y-%m-%dT%H:%M:%S.%f%z"
                 )
-                if args.skip_existing is True and os.path.isfile(f'{args.directory}/{path}'):
-                    print("skipping download of photo {created_at}, file exists already")
+                if args.skip_existing is True and os.path.isfile(f'{args.directory}/{path}.jpg'):
+                    print(f"skipping download of photo {created_at}, file exists already")
                     continue
 
                 # grab it
@@ -98,8 +98,8 @@ def main():
                 created_at = datetime.strptime(
                     activity["created_at"], "%Y-%m-%dT%H:%M:%S.%f%z"
                 )
-                if args.skip_existing is True and os.path.isfile(f'{args.directory}/{path}'):
-                    print("skipping download of video {created_at}, file exists already")
+                if args.skip_existing is True and os.path.isfile(f'{args.directory}/{path}.mp4'):
+                    print(f"skipping download of video {created_at}, file exists already")
                     continue
 
                 # grab it -- for some reason we need to use a new session to
@@ -219,15 +219,23 @@ def find_activities(s, student_id):
 
 
 def build_exif_bytes(image, created_date, comment):
-    """Given an image, acreated date, and a comment, builds EXIF byte buffer"""
-    exif_date = created_date.strftime("%Y:%m:%d %H:%M:%S")
+    """Given an image, a created date, and a comment, builds EXIF byte buffer"""
+    exif_date_utc_colons = created_date.astimezone(timezone.utc).strftime("%Y:%m:%d %H:%M:%S")
+    exif_offset_utc = "+00:00"
     try:
         exif = piexif.load(image.info["exif"])
     except KeyError:
         exif = {"0th": {}, "Exif": {}}
-    exif["0th"][piexif.ImageIFD.DateTime] = exif_date.encode("utf-8")
-    exif["Exif"][piexif.ExifIFD.DateTimeOriginal] = exif_date.encode("utf-8")
-    exif["Exif"][piexif.ExifIFD.DateTimeDigitized] = exif_date.encode("utf-8")
+    exif["0th"][piexif.ImageIFD.DateTime] = exif_date_utc_colons.encode("utf-8")
+    exif["0th"][piexif.ImageIFD.TimeZoneOffset] = exif_offset_utc.encode("utf-8")
+    exif["Exif"][piexif.ExifIFD.OffsetTime] = exif_offset_utc.encode("utf-8")
+
+    exif["Exif"][piexif.ExifIFD.DateTimeOriginal] = exif_date_utc_colons.encode("utf-8")
+    exif["Exif"][piexif.ExifIFD.OffsetTimeOriginal] = exif_offset_utc.encode("utf-8")
+    
+    exif["Exif"][piexif.ExifIFD.DateTimeDigitized] = exif_date_utc_colons.encode("utf-8")
+    exif["Exif"][piexif.ExifIFD.OffsetTimeDigitized] = exif_offset_utc.encode("utf-8")
+
     if comment:
         exif["0th"][piexif.ImageIFD.ImageDescription] = comment.encode("utf-8")
     return piexif.dump(exif)
