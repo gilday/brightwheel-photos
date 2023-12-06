@@ -26,7 +26,11 @@ def main():
     parser.add_argument("--student-id", help="Brightwheel student ID")
     parser.add_argument("--since", help="Skip any photos before a given YYYY-MM-DD")
     parser.add_argument("--before", help="Skip any photos after a given YYYY-MM-DD")
-    parser.add_argument("--skip-existing", action='store_true', help="Skip any existing photos or videos")
+    parser.add_argument(
+        "--skip-existing",
+        action="store_true",
+        help="Skip any existing photos or videos",
+    )
     args = parser.parse_args()
 
     os.makedirs(args.directory, exist_ok=True)
@@ -60,15 +64,15 @@ def main():
         for activity in find_activities(s, student_id):
             # Skip if less than since argument
             if args.since:
-                event_date = datetime.strptime(activity["event_date"][0:10], '%Y-%m-%d')
-                since = datetime.strptime(args.since, '%Y-%m-%d')
+                event_date = datetime.strptime(activity["event_date"][0:10], "%Y-%m-%d")
+                since = datetime.strptime(args.since, "%Y-%m-%d")
                 if event_date < since:
                     continue
-            
+
             # Skip if greater than before argument
             if args.before:
-                event_date = datetime.strptime(activity["event_date"][0:10], '%Y-%m-%d')
-                before = datetime.strptime(args.before, '%Y-%m-%d')
+                event_date = datetime.strptime(activity["event_date"][0:10], "%Y-%m-%d")
+                before = datetime.strptime(args.before, "%Y-%m-%d")
                 if event_date > before:
                     continue
 
@@ -78,8 +82,12 @@ def main():
                 created_at = datetime.strptime(
                     activity["created_at"], "%Y-%m-%dT%H:%M:%S.%f%z"
                 )
-                if args.skip_existing is True and os.path.isfile(f'{args.directory}/{path}.jpg'):
-                    print(f"skipping download of photo {created_at}, file exists already")
+                if args.skip_existing is True and os.path.isfile(
+                    f"{args.directory}/{path}.jpg"
+                ):
+                    print(
+                        f"skipping download of photo {created_at}, file exists already"
+                    )
                     continue
 
                 # grab it
@@ -88,7 +96,9 @@ def main():
                 comment = activity["note"]
                 exif = build_exif_bytes(image, created_at, comment)
                 image.save(
-                    "{directory}/{path}.jpg".format(directory=args.directory, path=path),
+                    "{directory}/{path}.jpg".format(
+                        directory=args.directory, path=path
+                    ),
                     exif=exif,
                 )
                 print(f"downloaded photo from {created_at}")
@@ -98,8 +108,12 @@ def main():
                 created_at = datetime.strptime(
                     activity["created_at"], "%Y-%m-%dT%H:%M:%S.%f%z"
                 )
-                if args.skip_existing is True and os.path.isfile(f'{args.directory}/{path}.mp4'):
-                    print(f"skipping download of video {created_at}, file exists already")
+                if args.skip_existing is True and os.path.isfile(
+                    f"{args.directory}/{path}.mp4"
+                ):
+                    print(
+                        f"skipping download of video {created_at}, file exists already"
+                    )
                     continue
 
                 # grab it -- for some reason we need to use a new session to
@@ -107,27 +121,33 @@ def main():
                 # in a permission denied error
                 with requests.Session() as vs:
                     r = vs.get(url, stream=True)
-                    with open("{directory}/{path}.mp4".format(directory=args.directory, path=path), "wb") as f:
+                    with open(
+                        "{directory}/{path}.mp4".format(
+                            directory=args.directory, path=path
+                        ),
+                        "wb",
+                    ) as f:
                         for chunk in r.iter_content(chunk_size=128):
                             f.write(chunk)
                         print(f"downloaded video from {created_at} from {url}")
+
 
 def trigger_2fa(s, email, password):
     """Trigger sending the 2FA login code"""
     login_data = {"user": {"email": email, "password": password}}
     headers = {
-        'Accept': 'application/json, text/plain, */*',
-        'Sec-Fetch-Site': 'same-origin',
-        'Accept-Language': 'en',
-        'Accept-Encoding': 'gzip, deflate, br',
-        'Sec-Fetch-Mode': 'cors',
-        'Host': 'schools.mybrightwheel.com',
-        'Origin': 'https://schools.mybrightwheel.com',
-        'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/16.5.2 Safari/605.1.15',
-        'Referer': 'https://schools.mybrightwheel.com/sign-in',
-        'Sec-Fetch-Dest': 'empty',
-        'X-Client-Name': 'web',
-        'X-Client-Version': '225',
+        "Accept": "application/json, text/plain, */*",
+        "Sec-Fetch-Site": "same-origin",
+        "Accept-Language": "en",
+        "Accept-Encoding": "gzip, deflate, br",
+        "Sec-Fetch-Mode": "cors",
+        "Host": "schools.mybrightwheel.com",
+        "Origin": "https://schools.mybrightwheel.com",
+        "User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/16.5.2 Safari/605.1.15",
+        "Referer": "https://schools.mybrightwheel.com/sign-in",
+        "Sec-Fetch-Dest": "empty",
+        "X-Client-Name": "web",
+        "X-Client-Version": "225",
     }
     r = s.post(
         "https://schools.mybrightwheel.com/api/v1/sessions/start",
@@ -142,25 +162,26 @@ def trigger_2fa(s, email, password):
         return twofacode
     return None
 
-def login(s, email, password, twofacode = None):
+
+def login(s, email, password, twofacode=None):
     """Login to Brightwheel and update the given requests session"""
     # login
     login_data = {"user": {"email": email, "password": password}}
     if not twofacode is None:
         login_data["2fa_code"] = twofacode
-    
+
     headers = {
-        'Accept': 'application/json, text/plain, */*',
-        'Sec-Fetch-Site': 'same-origin',
-        'Accept-Language': 'en',
-        'Accept-Encoding': 'gzip, deflate, br',
-        'Sec-Fetch-Mode': 'cors',
-        'Host': 'schools.mybrightwheel.com',
-        'Origin': 'https://schools.mybrightwheel.com',
-        'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/16.5.2 Safari/605.1.15',
-        'Referer': 'https://schools.mybrightwheel.com/sign-in',
-        'X-Client-Name': 'web',
-        'X-Client-Version': '225',
+        "Accept": "application/json, text/plain, */*",
+        "Sec-Fetch-Site": "same-origin",
+        "Accept-Language": "en",
+        "Accept-Encoding": "gzip, deflate, br",
+        "Sec-Fetch-Mode": "cors",
+        "Host": "schools.mybrightwheel.com",
+        "Origin": "https://schools.mybrightwheel.com",
+        "User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/16.5.2 Safari/605.1.15",
+        "Referer": "https://schools.mybrightwheel.com/sign-in",
+        "X-Client-Name": "web",
+        "X-Client-Version": "225",
     }
     r = s.post(
         "https://schools.mybrightwheel.com/api/v1/sessions",
@@ -190,7 +211,7 @@ def find_students(s):
 
 def find_activities(s, student_id):
     """Generator that returns all photo and video activities for the given student"""
-    action_types = ['ac_video', 'ac_photo']
+    action_types = ["ac_video", "ac_photo"]
     page_size = 10
     params = {
         "page_size": page_size,
@@ -220,7 +241,9 @@ def find_activities(s, student_id):
 
 def build_exif_bytes(image, created_date, comment):
     """Given an image, a created date, and a comment, builds EXIF byte buffer"""
-    exif_date_utc_colons = created_date.astimezone(timezone.utc).strftime("%Y:%m:%d %H:%M:%S")
+    exif_date_utc_colons = created_date.astimezone(timezone.utc).strftime(
+        "%Y:%m:%d %H:%M:%S"
+    )
     exif_offset_utc = "+00:00"
     try:
         exif = piexif.load(image.info["exif"])
@@ -232,8 +255,10 @@ def build_exif_bytes(image, created_date, comment):
 
     exif["Exif"][piexif.ExifIFD.DateTimeOriginal] = exif_date_utc_colons.encode("utf-8")
     exif["Exif"][piexif.ExifIFD.OffsetTimeOriginal] = exif_offset_utc.encode("utf-8")
-    
-    exif["Exif"][piexif.ExifIFD.DateTimeDigitized] = exif_date_utc_colons.encode("utf-8")
+
+    exif["Exif"][piexif.ExifIFD.DateTimeDigitized] = exif_date_utc_colons.encode(
+        "utf-8"
+    )
     exif["Exif"][piexif.ExifIFD.OffsetTimeDigitized] = exif_offset_utc.encode("utf-8")
 
     if comment:
