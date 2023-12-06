@@ -1,6 +1,6 @@
 # Brightwheel Photos
 
-Python script for downloading a student's photos from
+Python script for downloading a student's photos and videos from
 [Brightwheel](https://schools.mybrightwheel.com).
 
 My kid went to a daycare that used Brightwheel to communicate with parents and
@@ -10,21 +10,12 @@ downloads them all so I can keep them.
 Each photo's EXIF data includes the original creation date and any message
 attached to the photo as a comment.
 
-## Installing From Source
+## Use
 
-Create and activate virtual env
-
-```sh
-python3 -m venv venv
-. venv/bin/activate
-```
-
-Install requirements
+Install with `pipx install brightwheel-photos`
 
 ```sh
-pip3 install -r requirements.txt
+brightwheel-photos --email <brightwheel-account-email> --password <brightwheel-account-password> --directory ~/Photos/brightwheel
 ```
-
-## Run
 
 The program will exit when all the photos have been saved.

@@ -1,6 +1,6 @@
 [tool.poetry]
 name = "brightwheel-photos"
-version = "1.0.0"
+version = "0.4.0"
 description = "CLI tool for downloading a student's photos from Brightwheel."
 authors = ["Johnathan Gilday <me@johnathangilday.com>"]
 readme = "README.md"
@@ -8,7 +8,7 @@ packages = [{include = "brightwheel_photos"}]
 
 
 [tool.poetry.dependencies]
-python = "^3.7"
+python = "^3.8"
 certifi = "2022.12.7"
 chardet = "4.0.0"
 idna = "2.10"
@@ -19,8 +19,21 @@ requests = "2.25.1"
 urllib3 = "1.26.5"
 
 
+[tool.poetry.group.dev.dependencies]
+black = "^23.11.0"
+taskipy = "^1.12.2"
+pylint = "^3.0.3"
+pytest = "^7.4.3"
+
+
 [tool.poetry.scripts]
 brightwheel-photos = "brightwheel_photos.cli:main"
+
+
+[tool.taskipy.tasks]
+format = "black ."
+lint = "pylint --errors-only brightwheel_photos"
+test = "pytest"
 
 
 [build-system]
