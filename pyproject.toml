@@ -20,7 +20,7 @@ urllib3 = "1.26.5"
 
 
 [tool.poetry.group.dev.dependencies]
-black = "^23.11.0"
+black = ">=23.11,<25.0"
 taskipy = "^1.12.2"
 pylint = "^3.0.3"
 pytest = "^7.4.3"
