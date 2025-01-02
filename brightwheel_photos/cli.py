@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 
 import argparse
+import json
 from datetime import datetime, timezone
 import io
 import os
@@ -61,75 +62,78 @@ def main():
             student_id = students[0]["object_id"]
 
         # find and save all photos for the student
-        for activity in find_activities(s, student_id):
-            # Skip if less than since argument
-            if args.since:
-                event_date = datetime.strptime(activity["event_date"][0:10], "%Y-%m-%d")
-                since = datetime.strptime(args.since, "%Y-%m-%d")
-                if event_date < since:
-                    continue
+        with open(f"student-{student_id}-activities.jsonl", "w") as raw_fh:
+            for activity in find_activities(s, student_id):
+                json.dump(activity, raw_fh)
+                raw_fh.write("\n")
+                # Skip if less than since argument
+                if args.since:
+                    event_date = datetime.strptime(activity["event_date"][0:10], "%Y-%m-%d")
+                    since = datetime.strptime(args.since, "%Y-%m-%d")
+                    if event_date < since:
+                        continue
 
-            # Skip if greater than before argument
-            if args.before:
-                event_date = datetime.strptime(activity["event_date"][0:10], "%Y-%m-%d")
-                before = datetime.strptime(args.before, "%Y-%m-%d")
-                if event_date > before:
-                    continue
+                # Skip if greater than before argument
+                if args.before:
+                    event_date = datetime.strptime(activity["event_date"][0:10], "%Y-%m-%d")
+                    before = datetime.strptime(args.before, "%Y-%m-%d")
+                    if event_date > before:
+                        continue
 
-            if activity["media"] is not None:
-                url = activity["media"]["image_url"]
-                path = urlparse(url).path.split("/")[-1][:-4]
-                created_at = datetime.strptime(
-                    activity["created_at"], "%Y-%m-%dT%H:%M:%S.%f%z"
-                )
-                if args.skip_existing is True and os.path.isfile(
-                    f"{args.directory}/{path}.jpg"
-                ):
-                    print(
-                        f"skipping download of photo {created_at}, file exists already"
+                if activity["media"] is not None:
+                    url = activity["media"]["image_url"]
+                    path = urlparse(url).path.split("/")[-1][:-4]
+                    created_at = datetime.strptime(
+                        activity["created_at"], "%Y-%m-%dT%H:%M:%S.%f%z"
                     )
-                    continue
+                    if args.skip_existing is True and os.path.isfile(
+                        f"{args.directory}/{path}.jpg"
+                    ):
+                        print(
+                            f"skipping download of photo {created_at}, file exists already"
+                        )
+                        continue
 
-                # grab it
-                r = s.get(url)
-                image = Image.open(io.BytesIO(r.content))
-                comment = activity["note"]
-                exif = build_exif_bytes(image, created_at, comment)
-                image.save(
-                    "{directory}/{path}.jpg".format(
-                        directory=args.directory, path=path
-                    ),
-                    exif=exif,
-                )
-                print(f"downloaded photo from {created_at}")
-            elif activity["video_info"] is not None:
-                url = activity["video_info"]["downloadable_url"]
-                path = urlparse(url).path.split("/")[-1][:-4]
-                created_at = datetime.strptime(
-                    activity["created_at"], "%Y-%m-%dT%H:%M:%S.%f%z"
-                )
-                if args.skip_existing is True and os.path.isfile(
-                    f"{args.directory}/{path}.mp4"
-                ):
-                    print(
-                        f"skipping download of video {created_at}, file exists already"
-                    )
-                    continue
-
-                # grab it -- for some reason we need to use a new session to
-                # get the video content; using the existing session results
-                # in a permission denied error
-                with requests.Session() as vs:
-                    r = vs.get(url, stream=True)
-                    with open(
-                        "{directory}/{path}.mp4".format(
+                    # grab it
+                    r = s.get(url)
+                    image = Image.open(io.BytesIO(r.content))
+                    comment = activity["note"]
+                    exif = build_exif_bytes(image, created_at, comment)
+                    image.save(
+                        "{directory}/{path}.jpg".format(
                             directory=args.directory, path=path
                         ),
-                        "wb",
-                    ) as f:
-                        for chunk in r.iter_content(chunk_size=128):
-                            f.write(chunk)
-                        print(f"downloaded video from {created_at} from {url}")
+                        exif=exif,
+                    )
+                    print(f"downloaded photo from {created_at}")
+                elif activity["video_info"] is not None:
+                    url = activity["video_info"]["downloadable_url"]
+                    path = urlparse(url).path.split("/")[-1][:-4]
+                    created_at = datetime.strptime(
+                        activity["created_at"], "%Y-%m-%dT%H:%M:%S.%f%z"
+                    )
+                    if args.skip_existing is True and os.path.isfile(
+                        f"{args.directory}/{path}.mp4"
+                    ):
+                        print(
+                            f"skipping download of video {created_at}, file exists already"
+                        )
+                        continue
+
+                    # grab it -- for some reason we need to use a new session to
+                    # get the video content; using the existing session results
+                    # in a permission denied error
+                    with requests.Session() as vs:
+                        r = vs.get(url, stream=True)
+                        with open(
+                            "{directory}/{path}.mp4".format(
+                                directory=args.directory, path=path
+                            ),
+                            "wb",
+                        ) as f:
+                            for chunk in r.iter_content(chunk_size=128):
+                                f.write(chunk)
+                            print(f"downloaded video from {created_at} from {url}")
 
 
 def trigger_2fa(s, email, password):
@@ -210,33 +214,30 @@ def find_students(s):
 
 
 def find_activities(s, student_id):
-    """Generator that returns all photo and video activities for the given student"""
-    action_types = ["ac_video", "ac_photo"]
+    """Generator that returns all activities for the given student"""
     page_size = 10
     params = {
         "page_size": page_size,
         "include_parent_actions": "true",
     }
-    for action_type in action_types:
-        params["action_type"] = action_type
-        page = 0
+    page = 0
 
-        while True:
-            params["page"] = page
-            params["offset"] = page * page_size
-            r = s.get(
-                "https://schools.mybrightwheel.com/api/v1/students/{}/activities".format(
-                    student_id
-                ),
-                params=params,
-            )
-            data = r.json()
-            activities = data["activities"]
-            if len(activities) <= 0:
-                break
-            for activity in activities:
-                yield activity
-            page += 1
+    while True:
+        params["page"] = page
+        params["offset"] = page * page_size
+        r = s.get(
+            "https://schools.mybrightwheel.com/api/v1/students/{}/activities".format(
+                student_id
+            ),
+            params=params,
+        )
+        data = r.json()
+        activities = data["activities"]
+        if len(activities) <= 0:
+            break
+        for activity in activities:
+            yield activity
+        page += 1
 
 
 def build_exif_bytes(image, created_date, comment):
