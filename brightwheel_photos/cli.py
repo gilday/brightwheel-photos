@@ -62,7 +62,7 @@ def main():
             student_id = students[0]["object_id"]
 
         # find and save all photos for the student
-        with open(f"{student_id}-raw.json", "w") as raw_fh:
+        with open(f"student-{student_id}-activities.jsonl", "w") as raw_fh:
             for activity in find_activities(s, student_id):
                 json.dump(activity, raw_fh)
                 raw_fh.write("\n")
