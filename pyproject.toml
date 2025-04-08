@@ -9,7 +9,7 @@ packages = [{include = "brightwheel_photos"}]
 
 [tool.poetry.dependencies]
 python = "^3.8"
-certifi = "2023.7.22"
+certifi = "2024.7.4"
 chardet = "4.0.0"
 idna = "2.10"
 piexif = "1.1.3"
