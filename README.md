@@ -1,21 +1,16 @@
-# Brightwheel Photos
+# Brightwheel -> Babybuddy Sync
 
-Python script for downloading a student's photos and videos from
-[Brightwheel](https://schools.mybrightwheel.com).
+Python script for synchronizing data from 
+[Brightwheel](https://schools.mybrightwheel.com) to a local instance of [Baby Buddy](https://github.com/babybuddy/babybuddy) based on Gilday's [Brightwheel-Photos](https://github.com/gilday/brightwheel-photos)
 
-My kid went to a daycare that used Brightwheel to communicate with parents and
-guardians. The teachers sent plenty of photos using Brightwheel. This script
-downloads them all so I can keep them.
+This script pulls the following data from Brightwheel and inserts it into Baby Buddy:
+* Diaper changes
+* Bottle feedings
+* Solid food feedings
+* Naps
+* Observations (as notes)
+* Check-ins, check-outs (as notes)
 
-Each photo's EXIF data includes the original creation date and any message
-attached to the photo as a comment.
+Additionally, the original capabilities from Brightwheel-Photos are maintained.
 
-## Use
-
-Install with `pipx install brightwheel-photos`
-
-```sh
-brightwheel-photos --email <brightwheel-account-email> --password <brightwheel-account-password> --directory ~/Photos/brightwheel
-```
-
-The program will exit when all the photos have been saved.
+The program will exit when all all activities are synchronized and the photos have been saved.
