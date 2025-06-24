@@ -11,6 +11,8 @@ This script pulls the following data from Brightwheel and inserts it into Baby B
 * Observations (as notes)
 * Check-ins, check-outs (as notes)
 
+The synchronization is single-directional. Data from Baby Buddy is not imported into Brightwheel.
+
 Additionally, the original capabilities from Brightwheel-Photos are maintained.
 
 The program will exit when all all activities are synchronized and the photos have been saved.
