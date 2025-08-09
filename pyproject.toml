@@ -1,6 +1,6 @@
 [project]
 name = "brightwheel-photos"
-version = "0.4.0"
+version = "1.0.0"
 description = "CLI tool for downloading a student's photos from Brightwheel."
 authors = [{name = "Johnathan Gilday", email = "me@johnathangilday.com"}]
 readme = "README.md"
