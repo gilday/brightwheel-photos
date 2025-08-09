@@ -13,15 +13,17 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - run: pipx install poetry
+      - name: Install uv
+        uses: astral-sh/setup-uv@v4
 
-      - uses: actions/setup-python@v5
-        with:
-          cache: poetry
+      - name: Set up Python
+        run: uv python install 3.12
+
+      - name: Build package
+        run: uv build
 
       - name: Publish
         env:
-          PYPI_TOKEN: ${{ secrets.PYPI_TOKEN }}
+          UV_PUBLISH_TOKEN: ${{ secrets.PYPI_TOKEN }}
         run: |
-          poetry config pypi-token.pypi $PYPI_TOKEN
-          poetry publish --build
+          uv publish

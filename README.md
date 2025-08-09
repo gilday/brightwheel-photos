@@ -10,9 +10,21 @@ downloads them all so I can keep them.
 Each photo's EXIF data includes the original creation date and any message
 attached to the photo as a comment.
 
-## Use
+## Installation
 
-Install with `pipx install brightwheel-photos`
+Install with [uv](https://docs.astral.sh/uv/):
+
+```sh
+uv tool install brightwheel-photos
+```
+
+Or with pipx:
+
+```sh
+pipx install brightwheel-photos
+```
+
+## Use
 
 ### Using Environment Variables (Recommended)
 
