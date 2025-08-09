@@ -1,8 +1,8 @@
 [tool.poetry]
-name = "brightwheel-photos"
+name = "brightwheel-babybuddy-sync"
 version = "0.4.0"
-description = "CLI tool for downloading a student's photos from Brightwheel."
-authors = ["Johnathan Gilday <me@johnathangilday.com>"]
+description = "CLI tool for downloading a student's data from Brightwheel."
+authors = ["Johnathan Gilday <me@johnathangilday.com>","Tim Sweet <me@tsweet.org>"]
 readme = "README.md"
 packages = [{include = "brightwheel_photos"}]
 
@@ -27,7 +27,7 @@ pytest = "^7.4.3"
 
 
 [tool.poetry.scripts]
-brightwheel-photos = "brightwheel_photos.cli:main"
+brightwheel-babybuddy-sync = "brightwheel_photos.cli:main"
 
 
 [tool.taskipy.tasks]
