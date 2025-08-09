@@ -10,21 +10,35 @@ from urllib.parse import urlparse
 import piexif
 from PIL import Image
 import requests
+from dotenv import load_dotenv
 
 
 def main():
     """Runs brightwheel_photos cli"""
+    # Load environment variables from .env file
+    load_dotenv()
+    
     parser = argparse.ArgumentParser(description="Download photos from Brightwheel")
     parser.add_argument(
-        "--email", required=True, help="email used for Brightwheel account"
+        "--email", 
+        default=os.getenv("BRIGHTWHEEL_EMAIL"),
+        help="email used for Brightwheel account (or set BRIGHTWHEEL_EMAIL in .env)"
     )
     parser.add_argument(
-        "--password", required=True, help="password used for Brightwheel account"
+        "--password", 
+        default=os.getenv("BRIGHTWHEEL_PASSWORD"),
+        help="password used for Brightwheel account (or set BRIGHTWHEEL_PASSWORD in .env)"
     )
     parser.add_argument(
-        "--directory", required=True, help="directory in which to save the photos"
+        "--directory", 
+        default=os.getenv("BRIGHTWHEEL_DIRECTORY", "./photos"),
+        help="directory in which to save the photos (or set BRIGHTWHEEL_DIRECTORY in .env)"
     )
-    parser.add_argument("--student-id", help="Brightwheel student ID")
+    parser.add_argument(
+        "--student-id", 
+        default=os.getenv("BRIGHTWHEEL_STUDENT_ID"),
+        help="Brightwheel student ID (or set BRIGHTWHEEL_STUDENT_ID in .env)"
+    )
     parser.add_argument("--since", help="Skip any photos before a given YYYY-MM-DD")
     parser.add_argument("--before", help="Skip any photos after a given YYYY-MM-DD")
     parser.add_argument(
@@ -33,6 +47,17 @@ def main():
         help="Skip any existing photos or videos",
     )
     args = parser.parse_args()
+    
+    # Validate required credentials
+    if not args.email:
+        print("Error: Email is required. Provide via --email or BRIGHTWHEEL_EMAIL in .env", file=sys.stderr)
+        sys.exit(1)
+    if not args.password:
+        print("Error: Password is required. Provide via --password or BRIGHTWHEEL_PASSWORD in .env", file=sys.stderr)
+        sys.exit(1)
+    if not args.directory:
+        print("Error: Directory is required. Provide via --directory or BRIGHTWHEEL_DIRECTORY in .env", file=sys.stderr)
+        sys.exit(1)
 
     os.makedirs(args.directory, exist_ok=True)
     with requests.Session() as s:
