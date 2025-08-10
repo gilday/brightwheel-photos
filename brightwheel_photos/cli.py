@@ -11,6 +11,10 @@ import piexif
 from PIL import Image
 import requests
 
+#Useful references:
+# Babybuddy authentication: https://docs.baby-buddy.net/api/#authentication
+# The babybuddy API: https://github.com/babybuddy/babybuddy/blob/master/openapi-schema.yml
+# Brightwheel activities file in your browser: https://schools.mybrightwheel.com/api/v1/students/CHILD_ID/activities
 
 def main():
     """Runs brightwheel babybuddy sync cli"""
@@ -229,9 +233,6 @@ def handle_ins_and_outs(ins_outs, babybuddy_session, args):
 
                         headers = {"Content-Type": "application/json",
                                    "Authorization": f"Token {args.babybuddy_token}"}
-                        print(in_date)
-                        print(out_date)
-                        print(dropoff_report)
                         if(dropoff_report):
                             if dropoff_report["woke_up"] is None:
                                 print("Dropoff wake time not populated, using event date")
