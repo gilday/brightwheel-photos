@@ -42,7 +42,6 @@ def main():
     naps = [] #Each element is dict like {"event_date": "2025-08-01T21:59:45.908Z", "wake": True, "note": "A note"}
     with requests.Session() as brightwheel_session:
         try:
-            print(f"Logging in as {args.email} with password {args.password}")
             twofacode = trigger_2fa(brightwheel_session, args.email, args.password)
             login(brightwheel_session, args.email, args.password, twofacode)
         except requests.HTTPError as err:
@@ -77,7 +76,7 @@ def main():
                         event_date = datetime.strptime(activity["event_date"][0:10], "%Y-%m-%d")
                         since = datetime.strptime(args.since, "%Y-%m-%d")
                         if event_date < since:
-                            continue
+                            break #Brightwheel returns events in chronological order, so once we get here we don't need to keep iterating
                     # Skip if greater than before argument
                     if args.before:
                         event_date = datetime.strptime(activity["event_date"][0:10], "%Y-%m-%d")
@@ -230,10 +229,26 @@ def handle_ins_and_outs(ins_outs, babybuddy_session, args):
 
                         headers = {"Content-Type": "application/json",
                                    "Authorization": f"Token {args.babybuddy_token}"}
+                        print(in_date)
+                        print(out_date)
+                        print(dropoff_report)
+                        if(dropoff_report):
+                            if dropoff_report["woke_up"] is None:
+                                print("Dropoff wake time not populated, using event date")
+                                dropoff_report["woke_up"] = in_date
+                            if dropoff_report["last_ate"] is None:
+                                print("Last ate time not populated, using event date")
+                                dropoff_report["last_ate"] = in_date
+                            if dropoff_report["last_potty"] is None:
+                                print("Last potty time not populated, using event date")
+                                dropoff_report["last_potty"] = in_date
+                            note = f"Imported from Brightwheel: daycare check in at: {utc_to_local(in_date)}, check out at: {utc_to_local(out_date)}.\nDropoff report:\n    Woke up at: {utc_to_local(dropoff_report["woke_up"])}\n    Last ate at: {utc_to_local(dropoff_report["last_ate"])}\n    Last potty: {utc_to_local(dropoff_report["last_potty"])}\n    Pickup time: {utc_to_local(dropoff_report["pickup_time"])}"
+                        else:
+                            note = f"Imported from Brightwheel: daycare check in at: {utc_to_local(in_date)}, check out at: {utc_to_local(out_date)}.\nDropoff report was blank"
                         post_content = {"child": args.babybuddy_child_id,
                                     "time": out_date,
                                     "tags": ["Brightwheel"],
-                                    "note": f"Imported from Brightwheel: daycare check in at: {utc_to_local(in_date)}, check out at: {utc_to_local(out_date)}.\nDropoff report:\n    Woke up at: {utc_to_local(dropoff_report["woke_up"])}\n    Last ate at: {utc_to_local(dropoff_report["last_ate"])}\n    Last potty: {utc_to_local(dropoff_report["last_potty"])}\n    Pickup time: {utc_to_local(dropoff_report["pickup_time"])}"}
+                                    "note": note}
                         if args.skip_existing:
                             #check if this event already exists
                             params = {"limit": 1, "child": args.babybuddy_child_id, "date": out_date, "tags": ["Brightwheel"]}
@@ -247,8 +262,14 @@ def handle_ins_and_outs(ins_outs, babybuddy_session, args):
                                 print(f"Dropoff does not yet exist")
                         print(f"Creating dropoff: {post_content}")
                         
-                        r = babybuddy_session.post(f"{args.babybuddy_url}/api/notes/", headers=headers, json=post_content)
-                        r.raise_for_status()
+                        try:
+                            r = babybuddy_session.post(f"{args.babybuddy_url}/api/notes/", headers=headers, json=post_content)
+                            r.raise_for_status()
+                        except requests.exceptions.HTTPError as e:
+                            if args.ignore_errors and e.response.status_code == 400:
+                                print(f"Ignoring exception {e}, assuming event is already in Baby Buddy")
+                            else:
+                                raise
                     else:
                         print(f"Mismatched checkins expected in to be: {in_event} and out to be: {out_event}")
                     #Skip the next event, it has already been handled
@@ -269,9 +290,9 @@ def handle_naps(naps, babybuddy_session, args):
                         sleep_date = sleep_event["event_date"]
                         wake_date = wake_event["event_date"]
                         notes = ""
-                        if len(sleep_event["note"]) > 0:
+                        if sleep_event["note"] and len(sleep_event["note"]) > 0:
                             notes += f"Start nap note: {sleep_event["note"]}"
-                        if len(wake_event["note"]) > 0:
+                        if wake_event["note"] and len(wake_event["note"]) > 0:
                             notes += (" " if len(notes) > 0 else "") + f"End nap note: {wake_event["note"]}"
 
                         headers = {"Content-Type": "application/json",
@@ -295,8 +316,14 @@ def handle_naps(naps, babybuddy_session, args):
                                 print(f"Nap does not yet exist")
                         print(f"Creating nap: {post_content}")
                         
-                        r = babybuddy_session.post(f"{args.babybuddy_url}/api/sleep/", headers=headers, json=post_content)
-                        r.raise_for_status()
+                        try:
+                            r = babybuddy_session.post(f"{args.babybuddy_url}/api/sleep/", headers=headers, json=post_content)
+                            r.raise_for_status()
+                        except requests.exceptions.HTTPError as e:
+                            if args.ignore_errors and e.response.status_code == 400:
+                                print(f"Ignoring exception {e}, assuming event is already in Baby Buddy")
+                            else:
+                                raise
                     else:
                         print(f"Mismatched checkins expected wake to be: {wake_event} and sleep to be: {sleep_event}")
                     #Skip the next event, it has already been handled
