@@ -108,10 +108,10 @@ def main():
 
                     if activity["media"] is not None:
                         url = activity["media"]["image_url"]
-                        path = urlparse(url).path.split("/")[-1][:-4]
                         created_at = datetime.strptime(
                             activity["created_at"], "%Y-%m-%dT%H:%M:%S.%f%z"
                         )
+                        path = created_at.strftime("%Y-%m-%d_%H-%M-%S") + f"-{created_at.microsecond // 1000:03d}"
                         if args.skip_existing is True and os.path.isfile(
                             f"{args.directory}/{path}.jpg"
                         ):
@@ -134,10 +134,10 @@ def main():
                         print(f"downloaded photo from {created_at}")
                     elif activity["video_info"] is not None:
                         url = activity["video_info"]["downloadable_url"]
-                        path = urlparse(url).path.split("/")[-1][:-4]
                         created_at = datetime.strptime(
                             activity["created_at"], "%Y-%m-%dT%H:%M:%S.%f%z"
                         )
+                        path = created_at.strftime("%Y-%m-%d_%H-%M-%S") + f"-{created_at.microsecond // 1000:03d}"
                         if args.skip_existing is True and os.path.isfile(
                             f"{args.directory}/{path}.mp4"
                         ):
