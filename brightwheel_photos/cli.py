@@ -6,7 +6,6 @@ from datetime import datetime, timezone
 import io
 import os
 import sys
-from urllib.parse import urlparse
 import piexif
 from PIL import Image
 import requests
@@ -87,6 +86,7 @@ def main():
             student_id = students[0]["object_id"]
 
         # find and save all photos for the student
+        used_paths = set()
         try:
             with open(f"student-{student_id}-activities.jsonl", "w") as raw_fh:
                 for activity in find_activities(s, student_id, args.since):
@@ -108,10 +108,10 @@ def main():
 
                     if activity["media"] is not None:
                         url = activity["media"]["image_url"]
-                        path = urlparse(url).path.split("/")[-1][:-4]
                         created_at = datetime.strptime(
                             activity["created_at"], "%Y-%m-%dT%H:%M:%S.%f%z"
                         )
+                        path = build_unique_path(created_at, used_paths)
                         if args.skip_existing is True and os.path.isfile(
                             f"{args.directory}/{path}.jpg"
                         ):
@@ -134,10 +134,10 @@ def main():
                         print(f"downloaded photo from {created_at}")
                     elif activity["video_info"] is not None:
                         url = activity["video_info"]["downloadable_url"]
-                        path = urlparse(url).path.split("/")[-1][:-4]
                         created_at = datetime.strptime(
                             activity["created_at"], "%Y-%m-%dT%H:%M:%S.%f%z"
                         )
+                        path = build_unique_path(created_at, used_paths)
                         if args.skip_existing is True and os.path.isfile(
                             f"{args.directory}/{path}.mp4"
                         ):
@@ -163,6 +163,18 @@ def main():
         except KeyboardInterrupt:
             print("\nDownload interrupted by user. Exiting gracefully.", file=sys.stderr)
             sys.exit(130)  # Standard exit code for SIGINT
+
+
+def build_unique_path(created_at, used_paths):
+    """Build a timestamp-based filename stem, disambiguating collisions within this run."""
+    base = created_at.strftime("%Y-%m-%d_%H-%M-%S") + f"-{created_at.microsecond // 1000:03d}"
+    path = base
+    n = 1
+    while path in used_paths:
+        path = f"{base}-{n}"
+        n += 1
+    used_paths.add(path)
+    return path
 
 
 def trigger_2fa(s, email, password):
