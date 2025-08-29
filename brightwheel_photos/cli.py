@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 
 import argparse
+import getpass
 import json
 from datetime import datetime, timezone
 import io
@@ -55,18 +56,24 @@ def main():
             file=sys.stderr,
         )
         sys.exit(1)
-    if not args.password:
-        print(
-            "Error: Password is required. Provide via --password or BRIGHTWHEEL_PASSWORD in .env",
-            file=sys.stderr,
-        )
-        sys.exit(1)
     if not args.directory:
         print(
             "Error: Directory is required. Provide via --directory or BRIGHTWHEEL_DIRECTORY in .env",
             file=sys.stderr,
         )
         sys.exit(1)
+    if not args.password:
+        try:
+            args.password = getpass.getpass("Enter password: ")
+        except KeyboardInterrupt:
+            print("\nCancelled by user.", file=sys.stderr)
+            sys.exit(130)
+        except EOFError:
+            print("Error: Password required but not provided and no interactive terminal available.", file=sys.stderr)
+            sys.exit(1)
+        if not args.password:
+            print("Error: Password is required.", file=sys.stderr)
+            sys.exit(1)
 
     os.makedirs(args.directory, exist_ok=True)
     with requests.Session() as s:
