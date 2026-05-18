@@ -89,7 +89,7 @@ def main():
         # find and save all photos for the student
         try:
             with open(f"student-{student_id}-activities.jsonl", "w") as raw_fh:
-                for activity in find_activities(s, student_id):
+                for activity in find_activities(s, student_id, args.since):
                     json.dump(activity, raw_fh)
                     raw_fh.write("\n")
                     # Skip if less than since argument
@@ -242,8 +242,9 @@ def find_students(s):
     return [record["student"] for record in r.json()["students"]]
 
 
-def find_activities(s, student_id):
+def find_activities(s, student_id, arg_since=None):
     """Generator that returns all activities for the given student"""
+    since = datetime.strptime(arg_since, "%Y-%m-%d") if arg_since else None
     page_size = 10
     params = {
         "page_size": page_size,
@@ -264,7 +265,13 @@ def find_activities(s, student_id):
         activities = data["activities"]
         if len(activities) <= 0:
             break
+
         for activity in activities:
+            if since:
+                # the activity log is in chronological order, once we've found an old one we can exit
+                event_date = datetime.strptime(activity["event_date"][0:10], "%Y-%m-%d")
+                if event_date < since:
+                    return
             yield activity
         page += 1
 
