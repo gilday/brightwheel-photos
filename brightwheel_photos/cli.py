@@ -10,12 +10,12 @@ import click
 import piexif
 from PIL import Image
 import requests
-from dotenv import load_dotenv
+from dotenv import find_dotenv, load_dotenv
 
 
 def main():
     """Runs brightwheel_photos cli"""
-    load_dotenv()
+    load_dotenv(find_dotenv(usecwd=True))
     cli()  # pylint: disable=no-value-for-parameter
 
 
