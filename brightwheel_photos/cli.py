@@ -18,27 +18,27 @@ def main():
     """Runs brightwheel_photos cli"""
     # Load environment variables from .env file
     load_dotenv()
-    
+
     parser = argparse.ArgumentParser(description="Download photos from Brightwheel")
     parser.add_argument(
-        "--email", 
+        "--email",
         default=os.getenv("BRIGHTWHEEL_EMAIL"),
-        help="email used for Brightwheel account (or set BRIGHTWHEEL_EMAIL in .env)"
+        help="email used for Brightwheel account (or set BRIGHTWHEEL_EMAIL in .env)",
     )
     parser.add_argument(
-        "--password", 
+        "--password",
         default=os.getenv("BRIGHTWHEEL_PASSWORD"),
-        help="password used for Brightwheel account (or set BRIGHTWHEEL_PASSWORD in .env)"
+        help="password used for Brightwheel account (or set BRIGHTWHEEL_PASSWORD in .env)",
     )
     parser.add_argument(
-        "--directory", 
+        "--directory",
         default=os.getenv("BRIGHTWHEEL_DIRECTORY", "./photos"),
-        help="directory in which to save the photos (or set BRIGHTWHEEL_DIRECTORY in .env)"
+        help="directory in which to save the photos (or set BRIGHTWHEEL_DIRECTORY in .env)",
     )
     parser.add_argument(
-        "--student-id", 
+        "--student-id",
         default=os.getenv("BRIGHTWHEEL_STUDENT_ID"),
-        help="Brightwheel student ID (or set BRIGHTWHEEL_STUDENT_ID in .env)"
+        help="Brightwheel student ID (or set BRIGHTWHEEL_STUDENT_ID in .env)",
     )
     parser.add_argument("--since", help="Skip any photos before a given YYYY-MM-DD")
     parser.add_argument("--before", help="Skip any photos after a given YYYY-MM-DD")
@@ -48,22 +48,31 @@ def main():
         help="Skip any existing photos or videos",
     )
     args = parser.parse_args()
-    
+
     # Validate required credentials
     if not args.email:
-        print("Error: Email is required. Provide via --email or BRIGHTWHEEL_EMAIL in .env", file=sys.stderr)
+        print(
+            "Error: Email is required. Provide via --email or BRIGHTWHEEL_EMAIL in .env",
+            file=sys.stderr,
+        )
         sys.exit(1)
     if not args.directory:
-        print("Error: Directory is required. Provide via --directory or BRIGHTWHEEL_DIRECTORY in .env", file=sys.stderr)
+        print(
+            "Error: Directory is required. Provide via --directory or BRIGHTWHEEL_DIRECTORY in .env",
+            file=sys.stderr,
+        )
         sys.exit(1)
     if not args.password:
         try:
             args.password = getpass.getpass("Enter password: ")
         except KeyboardInterrupt:
-            print("\nDownload interrupted by user. Exiting gracefully.", file=sys.stderr)
+            print("\nCancelled by user.", file=sys.stderr)
             sys.exit(130)
         except EOFError:
             print("Error: Password required but not provided and no interactive terminal available.", file=sys.stderr)
+            sys.exit(1)
+        if not args.password:
+            print("Error: Password is required.", file=sys.stderr)
             sys.exit(1)
 
     os.makedirs(args.directory, exist_ok=True)
@@ -101,14 +110,18 @@ def main():
                     raw_fh.write("\n")
                     # Skip if less than since argument
                     if args.since:
-                        event_date = datetime.strptime(activity["event_date"][0:10], "%Y-%m-%d")
+                        event_date = datetime.strptime(
+                            activity["event_date"][0:10], "%Y-%m-%d"
+                        )
                         since = datetime.strptime(args.since, "%Y-%m-%d")
                         if event_date < since:
                             continue
 
                     # Skip if greater than before argument
                     if args.before:
-                        event_date = datetime.strptime(activity["event_date"][0:10], "%Y-%m-%d")
+                        event_date = datetime.strptime(
+                            activity["event_date"][0:10], "%Y-%m-%d"
+                        )
                         before = datetime.strptime(args.before, "%Y-%m-%d")
                         if event_date > before:
                             continue
@@ -168,7 +181,9 @@ def main():
                                     f.write(chunk)
                                 print(f"downloaded video from {created_at} from {url}")
         except KeyboardInterrupt:
-            print("\nDownload interrupted by user. Exiting gracefully.", file=sys.stderr)
+            print(
+                "\nDownload interrupted by user. Exiting gracefully.", file=sys.stderr
+            )
             sys.exit(130)  # Standard exit code for SIGINT
 
 
