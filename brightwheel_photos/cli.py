@@ -1,13 +1,12 @@
 #!/usr/bin/env python3
 
-import argparse
-import getpass
 import json
 from datetime import datetime, timezone
 import io
 import os
 import sys
 from urllib.parse import urlparse
+import click
 import piexif
 from PIL import Image
 import requests
@@ -16,76 +15,54 @@ from dotenv import load_dotenv
 
 def main():
     """Runs brightwheel_photos cli"""
-    # Load environment variables from .env file
     load_dotenv()
+    cli()  # pylint: disable=no-value-for-parameter
 
-    parser = argparse.ArgumentParser(description="Download photos from Brightwheel")
-    parser.add_argument(
-        "--email",
-        default=os.getenv("BRIGHTWHEEL_EMAIL"),
-        help="email used for Brightwheel account (or set BRIGHTWHEEL_EMAIL in .env)",
-    )
-    parser.add_argument(
-        "--password",
-        default=os.getenv("BRIGHTWHEEL_PASSWORD"),
-        help="password used for Brightwheel account (or set BRIGHTWHEEL_PASSWORD in .env)",
-    )
-    parser.add_argument(
-        "--directory",
-        default=os.getenv("BRIGHTWHEEL_DIRECTORY", "./photos"),
-        help="directory in which to save the photos (or set BRIGHTWHEEL_DIRECTORY in .env)",
-    )
-    parser.add_argument(
-        "--student-id",
-        default=os.getenv("BRIGHTWHEEL_STUDENT_ID"),
-        help="Brightwheel student ID (or set BRIGHTWHEEL_STUDENT_ID in .env)",
-    )
-    parser.add_argument("--since", help="Skip any photos before a given YYYY-MM-DD")
-    parser.add_argument("--before", help="Skip any photos after a given YYYY-MM-DD")
-    parser.add_argument(
-        "--skip-existing",
-        action="store_true",
-        help="Skip any existing photos or videos",
-    )
-    args = parser.parse_args()
 
-    # Validate required credentials
-    if not args.email:
-        print(
-            "Error: Email is required. Provide via --email or BRIGHTWHEEL_EMAIL in .env",
-            file=sys.stderr,
-        )
-        sys.exit(1)
-    if not args.directory:
-        print(
-            "Error: Directory is required. Provide via --directory or BRIGHTWHEEL_DIRECTORY in .env",
-            file=sys.stderr,
-        )
-        sys.exit(1)
-    if not args.password:
-        try:
-            args.password = getpass.getpass("Enter password: ")
-        except KeyboardInterrupt:
-            print("\nCancelled by user.", file=sys.stderr)
-            sys.exit(130)
-        except EOFError:
-            print("Error: Password required but not provided and no interactive terminal available.", file=sys.stderr)
-            sys.exit(1)
-        if not args.password:
-            print("Error: Password is required.", file=sys.stderr)
-            sys.exit(1)
-
-    os.makedirs(args.directory, exist_ok=True)
+@click.command(help="Download photos from Brightwheel")
+@click.option(
+    "--email",
+    envvar="BRIGHTWHEEL_EMAIL",
+    required=True,
+    help="email used for Brightwheel account (or set BRIGHTWHEEL_EMAIL in .env)",
+)
+@click.option(
+    "--password",
+    envvar="BRIGHTWHEEL_PASSWORD",
+    prompt=True,
+    hide_input=True,
+    help="password used for Brightwheel account (or set BRIGHTWHEEL_PASSWORD in .env)",
+)
+@click.option(
+    "--directory",
+    envvar="BRIGHTWHEEL_DIRECTORY",
+    default="./photos",
+    show_default=True,
+    help="directory in which to save the photos (or set BRIGHTWHEEL_DIRECTORY in .env)",
+)
+@click.option(
+    "--student-id",
+    envvar="BRIGHTWHEEL_STUDENT_ID",
+    default=None,
+    help="Brightwheel student ID (or set BRIGHTWHEEL_STUDENT_ID in .env)",
+)
+@click.option("--since", default=None, help="Skip any photos before a given YYYY-MM-DD")
+@click.option("--before", default=None, help="Skip any photos after a given YYYY-MM-DD")
+@click.option(
+    "--skip-existing", is_flag=True, help="Skip any existing photos or videos"
+)
+def cli(email, password, directory, student_id, since, before, skip_existing):
+    """Runs brightwheel_photos cli"""
+    os.makedirs(directory, exist_ok=True)
     with requests.Session() as s:
         try:
-            twofacode = trigger_2fa(s, args.email, args.password)
-            login(s, args.email, args.password, twofacode)
+            twofacode = trigger_2fa(s, email, password)
+            login(s, email, password, twofacode)
         except requests.HTTPError as err:
             if [err.response.status_code == 401]:
                 print("Login failed", file=sys.stderr)
                 sys.exit(1)
         # try to find student_id if not provided
-        student_id = args.student_id
         if not student_id:
             students = find_students(s)
             if len(students) > 1:
@@ -105,25 +82,25 @@ def main():
         # find and save all photos for the student
         try:
             with open(f"student-{student_id}-activities.jsonl", "w") as raw_fh:
-                for activity in find_activities(s, student_id, args.since):
+                for activity in find_activities(s, student_id, since):
                     json.dump(activity, raw_fh)
                     raw_fh.write("\n")
                     # Skip if less than since argument
-                    if args.since:
+                    if since:
                         event_date = datetime.strptime(
                             activity["event_date"][0:10], "%Y-%m-%d"
                         )
-                        since = datetime.strptime(args.since, "%Y-%m-%d")
-                        if event_date < since:
+                        since_date = datetime.strptime(since, "%Y-%m-%d")
+                        if event_date < since_date:
                             continue
 
                     # Skip if greater than before argument
-                    if args.before:
+                    if before:
                         event_date = datetime.strptime(
                             activity["event_date"][0:10], "%Y-%m-%d"
                         )
-                        before = datetime.strptime(args.before, "%Y-%m-%d")
-                        if event_date > before:
+                        before_date = datetime.strptime(before, "%Y-%m-%d")
+                        if event_date > before_date:
                             continue
 
                     if activity["media"] is not None:
@@ -132,8 +109,8 @@ def main():
                         created_at = datetime.strptime(
                             activity["created_at"], "%Y-%m-%dT%H:%M:%S.%f%z"
                         )
-                        if args.skip_existing is True and os.path.isfile(
-                            f"{args.directory}/{path}.jpg"
+                        if skip_existing is True and os.path.isfile(
+                            f"{directory}/{path}.jpg"
                         ):
                             print(
                                 f"skipping download of photo {created_at}, file exists already"
@@ -147,7 +124,7 @@ def main():
                         exif = build_exif_bytes(image, created_at, comment)
                         image.save(
                             "{directory}/{path}.jpg".format(
-                                directory=args.directory, path=path
+                                directory=directory, path=path
                             ),
                             exif=exif,
                         )
@@ -158,8 +135,8 @@ def main():
                         created_at = datetime.strptime(
                             activity["created_at"], "%Y-%m-%dT%H:%M:%S.%f%z"
                         )
-                        if args.skip_existing is True and os.path.isfile(
-                            f"{args.directory}/{path}.mp4"
+                        if skip_existing is True and os.path.isfile(
+                            f"{directory}/{path}.mp4"
                         ):
                             print(
                                 f"skipping download of video {created_at}, file exists already"
@@ -173,7 +150,7 @@ def main():
                             r = vs.get(url, stream=True)
                             with open(
                                 "{directory}/{path}.mp4".format(
-                                    directory=args.directory, path=path
+                                    directory=directory, path=path
                                 ),
                                 "wb",
                             ) as f:
