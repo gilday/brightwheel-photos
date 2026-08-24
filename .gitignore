@@ -163,3 +163,8 @@ Network Trash Folder
 Temporary Items
 .apdisk
 
+
+# Claude Code
+.claude/worktrees/
+.claude/settings.local.json
+
