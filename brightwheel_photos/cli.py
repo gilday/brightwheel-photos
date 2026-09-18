@@ -126,7 +126,9 @@ def cli(email, password, directory, student_id, since, before, skip_existing):
                             f"{directory}/{path}",
                             exif=exif,
                         )
-                        print(f"downloaded photo from {created_at}")
+                        print(
+                            f"downloaded photo from {created_at} in {directory}/{path}"
+                        )
                     elif activity["video_info"] is not None:
                         url = activity["video_info"]["downloadable_url"]
                         *_, path = urlparse(url.replace("%2F", "/")).path.split("/")
@@ -152,7 +154,9 @@ def cli(email, password, directory, student_id, since, before, skip_existing):
                             ) as f:
                                 for chunk in r.iter_content(chunk_size=128):
                                     f.write(chunk)
-                                print(f"downloaded video from {created_at} from {url}")
+                                print(
+                                    f"downloaded video from {created_at} in {directory}/{path}"
+                                )
         except KeyboardInterrupt:
             print(
                 "\nDownload interrupted by user. Exiting gracefully.", file=sys.stderr
