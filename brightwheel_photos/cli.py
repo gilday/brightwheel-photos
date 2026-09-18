@@ -122,10 +122,7 @@ def cli(email, password, directory, student_id, since, before, skip_existing):
                         image = Image.open(io.BytesIO(r.content))
                         comment = activity["note"]
                         exif = build_exif_bytes(image, created_at, comment)
-                        image.save(
-                            f"{directory}/{path}",
-                            exif=exif,
-                        )
+                        image.save(f"{directory}/{path}", exif=exif)
                         print(
                             f"downloaded photo from {created_at} in {directory}/{path}"
                         )
@@ -148,10 +145,7 @@ def cli(email, password, directory, student_id, since, before, skip_existing):
                         # in a permission denied error
                         with requests.Session() as vs:
                             r = vs.get(url, stream=True)
-                            with open(
-                                f"{directory}/{path}",
-                                "wb",
-                            ) as f:
+                            with open(f"{directory}/{path}", "wb") as f:
                                 for chunk in r.iter_content(chunk_size=128):
                                     f.write(chunk)
                                 print(
