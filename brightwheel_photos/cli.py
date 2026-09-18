@@ -106,12 +106,11 @@ def cli(email, password, directory, student_id, since, before, skip_existing):
                     if activity["media"] is not None:
                         url = activity["media"]["image_url"]
                         *_, path = urlparse(url.replace("%2F", "/")).path.split("/")
+                        output_path = os.path.join(directory, path)
                         created_at = datetime.strptime(
                             activity["created_at"], "%Y-%m-%dT%H:%M:%S.%f%z"
                         )
-                        if skip_existing is True and os.path.isfile(
-                            f"{directory}/{path}"
-                        ):
+                        if skip_existing is True and os.path.isfile(output_path):
                             print(
                                 f"skipping download of photo {created_at}, file exists already"
                             )
@@ -122,19 +121,16 @@ def cli(email, password, directory, student_id, since, before, skip_existing):
                         image = Image.open(io.BytesIO(r.content))
                         comment = activity["note"]
                         exif = build_exif_bytes(image, created_at, comment)
-                        image.save(f"{directory}/{path}", exif=exif)
-                        print(
-                            f"downloaded photo from {created_at} in {directory}/{path}"
-                        )
+                        image.save(output_path, exif=exif)
+                        print(f"downloaded photo from {created_at} in {output_path}")
                     elif activity["video_info"] is not None:
                         url = activity["video_info"]["downloadable_url"]
                         *_, path = urlparse(url.replace("%2F", "/")).path.split("/")
                         created_at = datetime.strptime(
                             activity["created_at"], "%Y-%m-%dT%H:%M:%S.%f%z"
                         )
-                        if skip_existing is True and os.path.isfile(
-                            f"{directory}/{path}"
-                        ):
+                        output_path = os.path.join(directory, path)
+                        if skip_existing is True and os.path.isfile(output_path):
                             print(
                                 f"skipping download of video {created_at}, file exists already"
                             )
@@ -145,11 +141,11 @@ def cli(email, password, directory, student_id, since, before, skip_existing):
                         # in a permission denied error
                         with requests.Session() as vs:
                             r = vs.get(url, stream=True)
-                            with open(f"{directory}/{path}", "wb") as f:
+                            with open(output_path, "wb") as f:
                                 for chunk in r.iter_content(chunk_size=128):
                                     f.write(chunk)
                                 print(
-                                    f"downloaded video from {created_at} in {directory}/{path}"
+                                    f"downloaded video from {created_at} in {output_path}"
                                 )
         except KeyboardInterrupt:
             print(
