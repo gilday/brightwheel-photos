@@ -123,9 +123,7 @@ def cli(email, password, directory, student_id, since, before, skip_existing):
                         comment = activity["note"]
                         exif = build_exif_bytes(image, created_at, comment)
                         image.save(
-                            "{directory}/{path}".format(
-                                directory=directory, path=path
-                            ),
+                            f"{directory}/{path}",
                             exif=exif,
                         )
                         print(f"downloaded photo from {created_at}")
@@ -149,9 +147,7 @@ def cli(email, password, directory, student_id, since, before, skip_existing):
                         with requests.Session() as vs:
                             r = vs.get(url, stream=True)
                             with open(
-                                "{directory}/{path}".format(
-                                    directory=directory, path=path
-                                ),
+                                f"{directory}/{path}",
                                 "wb",
                             ) as f:
                                 for chunk in r.iter_content(chunk_size=128):
