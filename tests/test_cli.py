@@ -217,6 +217,85 @@ def test_video_url_percent_encoding_is_decoded(tmp_path, monkeypatch):
         assert f.read() == b"video content"
 
 
+def write_existing(name):
+    os.makedirs("photos", exist_ok=True)
+    with open(os.path.join("photos", name), "w") as f:
+        f.write("existing")
+
+
+def fail_on_download(monkeypatch):
+    def get(self, *args, **kwargs):
+        raise RuntimeError("network should not be reached when skipping")
+
+    monkeypatch.setattr(requests.Session, "get", get)
+
+
+LEGACY_PHOTO_NAME = (
+    "media_images%2Fimages%2F134%2F455%2F440%2Fcover"
+    "%2F0fb20b10635bce296fc4ff6ce9b4e9a4.jpg"
+)
+LEGACY_VIDEO_NAME = (
+    "media_videos%2Fvideos%2F134%2F455%2F440" "%2F9c1f0e7b4a2d6f8e0b3c5a7d9e1f2a4b.mp4"
+)
+
+
+def test_skip_existing_matches_legacy_photo_name(tmp_path, monkeypatch):
+    stub_network(monkeypatch)
+    monkeypatch.chdir(tmp_path)
+    stub_activities(monkeypatch, photo_activity(ENCODED_PHOTO_URL))
+    fail_on_download(monkeypatch)
+    write_existing(LEGACY_PHOTO_NAME)
+
+    result = run_cli("--skip-existing")
+
+    assert result.exit_code == 0
+    assert "file exists already" in result.output
+    assert os.listdir("photos") == [LEGACY_PHOTO_NAME]
+
+
+def test_skip_existing_matches_legacy_video_name(tmp_path, monkeypatch):
+    stub_network(monkeypatch)
+    monkeypatch.chdir(tmp_path)
+    stub_activities(monkeypatch, video_activity(ENCODED_VIDEO_URL))
+    fail_on_download(monkeypatch)
+    write_existing(LEGACY_VIDEO_NAME)
+
+    result = run_cli("--skip-existing")
+
+    assert result.exit_code == 0
+    assert "file exists already" in result.output
+    assert os.listdir("photos") == [LEGACY_VIDEO_NAME]
+
+
+def test_skip_existing_matches_current_photo_name(tmp_path, monkeypatch):
+    stub_network(monkeypatch)
+    monkeypatch.chdir(tmp_path)
+    stub_activities(monkeypatch, photo_activity(ENCODED_PHOTO_URL))
+    fail_on_download(monkeypatch)
+    write_existing("0fb20b10635bce296fc4ff6ce9b4e9a4.jpg")
+
+    result = run_cli("--skip-existing")
+
+    assert result.exit_code == 0
+    assert "file exists already" in result.output
+
+
+def test_unrelated_existing_media_is_still_downloaded(tmp_path, monkeypatch):
+    stub_network(monkeypatch)
+    monkeypatch.chdir(tmp_path)
+    stub_activities(monkeypatch, photo_activity(ENCODED_PHOTO_URL))
+    stub_download(monkeypatch, image_bytes())
+    write_existing("some-other-photo.jpg")
+
+    result = run_cli("--skip-existing")
+
+    assert result.exit_code == 0
+    assert sorted(os.listdir("photos")) == [
+        "0fb20b10635bce296fc4ff6ce9b4e9a4.jpg",
+        "some-other-photo.jpg",
+    ]
+
+
 def test_empty_password_reprompts(tmp_path, monkeypatch):
     stub_network(monkeypatch)
     monkeypatch.chdir(tmp_path)

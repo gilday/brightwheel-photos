@@ -105,12 +105,13 @@ def cli(email, password, directory, student_id, since, before, skip_existing):
 
                     if activity["media"] is not None:
                         url = activity["media"]["image_url"]
-                        *_, path = urlparse(url.replace("%2F", "/")).path.split("/")
-                        output_path = os.path.join(directory, path)
+                        output_path = media_path(directory, url)
                         created_at = datetime.strptime(
                             activity["created_at"], "%Y-%m-%dT%H:%M:%S.%f%z"
                         )
-                        if skip_existing is True and os.path.isfile(output_path):
+                        if skip_existing is True and is_downloaded(
+                            directory, url, "jpg"
+                        ):
                             print(
                                 f"skipping download of photo {created_at}, file exists already"
                             )
@@ -125,12 +126,13 @@ def cli(email, password, directory, student_id, since, before, skip_existing):
                         print(f"downloaded photo from {created_at} in {output_path}")
                     elif activity["video_info"] is not None:
                         url = activity["video_info"]["downloadable_url"]
-                        *_, path = urlparse(url.replace("%2F", "/")).path.split("/")
+                        output_path = media_path(directory, url)
                         created_at = datetime.strptime(
                             activity["created_at"], "%Y-%m-%dT%H:%M:%S.%f%z"
                         )
-                        output_path = os.path.join(directory, path)
-                        if skip_existing is True and os.path.isfile(output_path):
+                        if skip_existing is True and is_downloaded(
+                            directory, url, "mp4"
+                        ):
                             print(
                                 f"skipping download of video {created_at}, file exists already"
                             )
@@ -152,6 +154,26 @@ def cli(email, password, directory, student_id, since, before, skip_existing):
                 "\nDownload interrupted by user. Exiting gracefully.", file=sys.stderr
             )
             sys.exit(130)  # Standard exit code for SIGINT
+
+
+def media_path(directory, url):
+    """Path at which media downloaded from the given URL is saved"""
+    # the storage key arrives as one percent-encoded path segment, so decode the
+    # separators before splitting to reach the object name and its extension
+    *_, name = urlparse(url.replace("%2F", "/")).path.split("/")
+    return os.path.join(directory, name)
+
+
+def is_downloaded(directory, url, legacy_extension):
+    """Whether this media is already saved under its current or legacy name
+
+    Releases before the percent-encoded separators were decoded saved the whole
+    encoded storage key as the filename. Those downloads still count as present
+    so that upgrading does not re-fetch an entire back catalog under new names.
+    """
+    legacy_name = urlparse(url).path.split("/")[-1][:-4]
+    legacy_path = os.path.join(directory, f"{legacy_name}.{legacy_extension}")
+    return os.path.isfile(media_path(directory, url)) or os.path.isfile(legacy_path)
 
 
 def trigger_2fa(s, email, password):
