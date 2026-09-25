@@ -10,11 +10,11 @@ from PIL import Image
 from brightwheel_photos import cli as cli_module
 from brightwheel_photos.cli import cli
 
-# Brightwheel serves media from a CDN that embeds the storage key as a single
-# percent-encoded path segment, so the %2F are separators rather than literals.
+# Brightwheel serves photos as PNGs from a CDN that embeds the storage key as a
+# single percent-encoded path segment, so the %2F are separators, not literals.
 ENCODED_PHOTO_URL = (
     "https://cdn.mybrightwheel.com/media_images%2Fimages%2F134%2F455%2F440"
-    "%2Fcover%2F0fb20b10635bce296fc4ff6ce9b4e9a4.jpg?alt=media"
+    "%2Fcover%2F0fb20b10635bce296fc4ff6ce9b4e9a4.png?alt=media"
 )
 ENCODED_VIDEO_URL = (
     "https://cdn.mybrightwheel.com/media_videos%2Fvideos%2F134%2F455%2F440"
@@ -59,7 +59,7 @@ def video_activity(url):
     }
 
 
-def image_bytes(image_format="JPEG"):
+def image_bytes(image_format="PNG"):
     buffer = io.BytesIO()
     Image.new("RGB", (2, 2), "red").save(buffer, format=image_format)
     return buffer.getvalue()
@@ -188,9 +188,9 @@ def test_photo_is_saved_with_exif_metadata(tmp_path, monkeypatch):
 
 
 @pytest.mark.parametrize(
-    "extension, image_format", [("jpg", "JPEG"), ("jpeg", "JPEG"), ("png", "PNG")]
+    "extension, image_format", [("png", "PNG"), ("jpeg", "JPEG"), ("jpg", "JPEG")]
 )
-def test_photo_extension_comes_from_url(tmp_path, monkeypatch, extension, image_format):
+def test_photo_is_saved_as_jpeg(tmp_path, monkeypatch, extension, image_format):
     stub_network(monkeypatch)
     monkeypatch.chdir(tmp_path)
     url = f"https://cdn.mybrightwheel.com/media_images%2Fcover%2Fabc123.{extension}"
@@ -200,7 +200,9 @@ def test_photo_extension_comes_from_url(tmp_path, monkeypatch, extension, image_
     result = run_cli()
 
     assert result.exit_code == 0
-    assert os.listdir("photos") == [f"abc123.{extension}"]
+    assert os.listdir("photos") == ["abc123.jpg"]
+    with Image.open("photos/abc123.jpg") as saved:
+        assert saved.format == "JPEG"
 
 
 def test_video_url_percent_encoding_is_decoded(tmp_path, monkeypatch):
