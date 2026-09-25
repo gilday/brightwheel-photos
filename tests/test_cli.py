@@ -20,6 +20,13 @@ ENCODED_VIDEO_URL = (
 )
 
 
+@pytest.fixture(autouse=True)
+def isolate_brightwheel_env(monkeypatch):
+    for name in list(os.environ):
+        if name.startswith("BRIGHTWHEEL_"):
+            monkeypatch.delenv(name)
+
+
 def stub_network(monkeypatch):
     monkeypatch.setattr(cli_module, "trigger_2fa", lambda s, email, password: None)
     monkeypatch.setattr(
@@ -87,7 +94,7 @@ def run_cli(*args):
 
 def test_missing_email_exits_2_with_message():
     runner = CliRunner()
-    result = runner.invoke(cli, ["--password", "secret"], env={"BRIGHTWHEEL_EMAIL": ""})
+    result = runner.invoke(cli, ["--password", "secret"])
 
     assert result.exit_code == 2
     assert "Missing option '--email'" in result.output
