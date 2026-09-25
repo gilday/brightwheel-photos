@@ -4,13 +4,17 @@ import json
 from datetime import datetime, timezone
 import io
 import os
+import posixpath
 import sys
-from urllib.parse import urlparse
+from urllib.parse import unquote, urlparse
 import click
 import piexif
 from PIL import Image
 import requests
 from dotenv import find_dotenv, load_dotenv
+
+PHOTO_EXTENSION = "jpg"
+VIDEO_EXTENSION = "mp4"
 
 
 def main():
@@ -106,14 +110,12 @@ def cli(email, password, directory, student_id, since, before, skip_existing):
 
                     if activity["media"] is not None:
                         url = activity["media"]["image_url"]
-                        # always JPEG, whatever the source format, because photo
-                        # libraries reliably read EXIF dates from JPEG
-                        output_path = media_path(directory, url, "jpg")
+                        output_path = media_path(directory, url, PHOTO_EXTENSION)
                         created_at = datetime.strptime(
                             activity["created_at"], "%Y-%m-%dT%H:%M:%S.%f%z"
                         )
                         if skip_existing is True and is_downloaded(
-                            directory, url, "jpg"
+                            directory, url, PHOTO_EXTENSION
                         ):
                             print(
                                 f"skipping download of photo {created_at}, file exists already"
@@ -129,12 +131,12 @@ def cli(email, password, directory, student_id, since, before, skip_existing):
                         print(f"downloaded photo from {created_at} in {output_path}")
                     elif activity["video_info"] is not None:
                         url = activity["video_info"]["downloadable_url"]
-                        output_path = media_path(directory, url, "mp4")
+                        output_path = media_path(directory, url, VIDEO_EXTENSION)
                         created_at = datetime.strptime(
                             activity["created_at"], "%Y-%m-%dT%H:%M:%S.%f%z"
                         )
                         if skip_existing is True and is_downloaded(
-                            directory, url, "mp4"
+                            directory, url, VIDEO_EXTENSION
                         ):
                             print(
                                 f"skipping download of video {created_at}, file exists already"
@@ -161,24 +163,21 @@ def cli(email, password, directory, student_id, since, before, skip_existing):
 
 def media_path(directory, url, extension):
     """Path at which media downloaded from the given URL is saved"""
-    # the storage key arrives as one percent-encoded path segment, so decode the
-    # separators before splitting to reach the object name
-    *_, name = urlparse(url.replace("%2F", "/")).path.split("/")
+    name = posixpath.basename(unquote(urlparse(url).path))
     stem, _ = os.path.splitext(name)
     return os.path.join(directory, f"{stem}.{extension}")
 
 
-def is_downloaded(directory, url, extension):
-    """Whether this media is already saved under its current or legacy name
+def legacy_media_path(directory, url, extension):
+    """Path at which releases before 2.0.0 saved media from the given URL"""
+    encoded_name = posixpath.basename(urlparse(url).path)
+    return os.path.join(directory, f"{encoded_name[:-4]}.{extension}")
 
-    Releases before the percent-encoded separators were decoded saved the whole
-    encoded storage key as the filename. Those downloads still count as present
-    so that upgrading does not re-fetch an entire back catalog under new names.
-    """
-    legacy_name = urlparse(url).path.split("/")[-1][:-4]
-    legacy_path = os.path.join(directory, f"{legacy_name}.{extension}")
+
+def is_downloaded(directory, url, extension):
+    """Whether media from the given URL is saved under its current or legacy path"""
     return os.path.isfile(media_path(directory, url, extension)) or os.path.isfile(
-        legacy_path
+        legacy_media_path(directory, url, extension)
     )
 
 

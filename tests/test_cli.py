@@ -10,8 +10,6 @@ from PIL import Image
 from brightwheel_photos import cli as cli_module
 from brightwheel_photos.cli import cli
 
-# Brightwheel serves photos as PNGs from a CDN that embeds the storage key as a
-# single percent-encoded path segment, so the %2F are separators, not literals.
 ENCODED_PHOTO_URL = (
     "https://cdn.mybrightwheel.com/media_images%2Fimages%2F134%2F455%2F440"
     "%2Fcover%2F0fb20b10635bce296fc4ff6ce9b4e9a4.png?alt=media"
@@ -75,9 +73,7 @@ class StubResponse:
 
 
 def stub_download(monkeypatch, content):
-    """Serves the given bytes for every media download"""
-
-    def get(self, url, **kwargs):  # pylint: disable=unused-argument
+    def get(self, *args, **kwargs):
         return StubResponse(content)
 
     monkeypatch.setattr(requests.Session, "get", get)
