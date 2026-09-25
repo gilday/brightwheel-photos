@@ -38,7 +38,8 @@ def main():
     envvar="BRIGHTWHEEL_DIRECTORY",
     default="./photos",
     show_default=True,
-    help="directory in which to save the photos (or set BRIGHTWHEEL_DIRECTORY in .env)",
+    help="directory in which to save photos (JPEG) and videos (MP4) "
+    "(or set BRIGHTWHEEL_DIRECTORY in .env)",
 )
 @click.option(
     "--student-id",
