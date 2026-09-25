@@ -7,8 +7,10 @@ My kid went to a daycare that used Brightwheel to communicate with parents and
 guardians. The teachers sent plenty of photos using Brightwheel. This script
 downloads them all so I can keep them.
 
-Each photo's EXIF data includes the original creation date and any message
-attached to the photo as a comment.
+Photos are saved as JPEG, converted from whatever format Brightwheel serves,
+because photo libraries reliably read EXIF metadata from JPEG. Each photo's
+EXIF data includes the original creation date and any message attached to the
+photo as a comment. Videos are saved as MP4.
 
 ## Installation
 

@@ -4,13 +4,17 @@ import json
 from datetime import datetime, timezone
 import io
 import os
+import posixpath
 import sys
-from urllib.parse import urlparse
+from urllib.parse import unquote, urlparse
 import click
 import piexif
 from PIL import Image
 import requests
 from dotenv import find_dotenv, load_dotenv
+
+PHOTO_EXTENSION = "jpg"
+VIDEO_EXTENSION = "mp4"
 
 
 def main():
@@ -38,7 +42,8 @@ def main():
     envvar="BRIGHTWHEEL_DIRECTORY",
     default="./photos",
     show_default=True,
-    help="directory in which to save the photos (or set BRIGHTWHEEL_DIRECTORY in .env)",
+    help="directory in which to save photos (JPEG) and videos (MP4) "
+    "(or set BRIGHTWHEEL_DIRECTORY in .env)",
 )
 @click.option(
     "--student-id",
@@ -105,12 +110,12 @@ def cli(email, password, directory, student_id, since, before, skip_existing):
 
                     if activity["media"] is not None:
                         url = activity["media"]["image_url"]
-                        path = urlparse(url).path.split("/")[-1][:-4]
+                        output_path = media_path(directory, url, PHOTO_EXTENSION)
                         created_at = datetime.strptime(
                             activity["created_at"], "%Y-%m-%dT%H:%M:%S.%f%z"
                         )
-                        if skip_existing is True and os.path.isfile(
-                            f"{directory}/{path}.jpg"
+                        if skip_existing is True and is_downloaded(
+                            directory, url, PHOTO_EXTENSION
                         ):
                             print(
                                 f"skipping download of photo {created_at}, file exists already"
@@ -122,21 +127,16 @@ def cli(email, password, directory, student_id, since, before, skip_existing):
                         image = Image.open(io.BytesIO(r.content))
                         comment = activity["note"]
                         exif = build_exif_bytes(image, created_at, comment)
-                        image.save(
-                            "{directory}/{path}.jpg".format(
-                                directory=directory, path=path
-                            ),
-                            exif=exif,
-                        )
-                        print(f"downloaded photo from {created_at}")
+                        image.save(output_path, exif=exif)
+                        print(f"downloaded photo from {created_at} in {output_path}")
                     elif activity["video_info"] is not None:
                         url = activity["video_info"]["downloadable_url"]
-                        path = urlparse(url).path.split("/")[-1][:-4]
+                        output_path = media_path(directory, url, VIDEO_EXTENSION)
                         created_at = datetime.strptime(
                             activity["created_at"], "%Y-%m-%dT%H:%M:%S.%f%z"
                         )
-                        if skip_existing is True and os.path.isfile(
-                            f"{directory}/{path}.mp4"
+                        if skip_existing is True and is_downloaded(
+                            directory, url, VIDEO_EXTENSION
                         ):
                             print(
                                 f"skipping download of video {created_at}, file exists already"
@@ -148,20 +148,37 @@ def cli(email, password, directory, student_id, since, before, skip_existing):
                         # in a permission denied error
                         with requests.Session() as vs:
                             r = vs.get(url, stream=True)
-                            with open(
-                                "{directory}/{path}.mp4".format(
-                                    directory=directory, path=path
-                                ),
-                                "wb",
-                            ) as f:
+                            with open(output_path, "wb") as f:
                                 for chunk in r.iter_content(chunk_size=128):
                                     f.write(chunk)
-                                print(f"downloaded video from {created_at} from {url}")
+                                print(
+                                    f"downloaded video from {created_at} in {output_path}"
+                                )
         except KeyboardInterrupt:
             print(
                 "\nDownload interrupted by user. Exiting gracefully.", file=sys.stderr
             )
             sys.exit(130)  # Standard exit code for SIGINT
+
+
+def media_path(directory, url, extension):
+    """Path at which media downloaded from the given URL is saved"""
+    name = posixpath.basename(unquote(urlparse(url).path))
+    stem, _ = os.path.splitext(name)
+    return os.path.join(directory, f"{stem}.{extension}")
+
+
+def legacy_media_path(directory, url, extension):
+    """Path at which releases before 2.0.0 saved media from the given URL"""
+    encoded_name = posixpath.basename(urlparse(url).path)
+    return os.path.join(directory, f"{encoded_name[:-4]}.{extension}")
+
+
+def is_downloaded(directory, url, extension):
+    """Whether media from the given URL is saved under its current or legacy path"""
+    return os.path.isfile(media_path(directory, url, extension)) or os.path.isfile(
+        legacy_media_path(directory, url, extension)
+    )
 
 
 def trigger_2fa(s, email, password):
